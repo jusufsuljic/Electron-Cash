@@ -20,6 +20,7 @@ val py by lazy {
 }
 fun libMod(name: String) = py.getModule("electroncash.$name")
 fun guiMod(name: String) = py.getModule("electroncash_gui.android.$name")
+fun pluginMod(name: String) = py.getModule("electroncash_plugins.$name")
 val libNetworks by lazy { libMod("networks") }
 
 
@@ -55,6 +56,7 @@ class App : Application() {
         initNetwork()
         initExchange()
         initCaption()
+        setupTorServices(app)
     }
 
 }

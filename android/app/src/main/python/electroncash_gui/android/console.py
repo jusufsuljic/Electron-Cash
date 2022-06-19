@@ -70,6 +70,9 @@ class Help:
                 cmd = all_commands[name_or_wrapper]
             return f"{cmd}\n{cmd.description}"
 
+def init_plugins(config, gui_name):
+        from electroncash.plugins import Plugins
+        return Plugins(config, gui_name)
 
 # Adds additional commands which aren't available over JSON RPC.
 class AndroidCommands(commands.Commands):
@@ -81,7 +84,8 @@ class AndroidCommands(commands.Commands):
 
         # Create daemon here rather than in start() so the DaemonModel has a chance to register
         # its callback before the daemon threads start.
-        self.daemon = daemon.Daemon(self.config, fd, is_gui=False, plugins=None)
+        self.plugins = init_plugins(self.config, self.config.get("fusion"))
+        self.daemon = daemon.Daemon(self.config, fd, is_gui=False, plugins=self.plugins)
         self.daemon_running = False
 
         self.gui_callback = None

@@ -29,16 +29,19 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.observe
 import com.chaquo.python.Kwarg
-import com.chaquo.python.PyException
 import com.chaquo.python.PyObject
+import io.matthewnelson.topl_service.TorServiceController
 import kotlinx.android.synthetic.main.main.*
-import kotlinx.android.synthetic.main.show_master_key.walletMasterKey
 import kotlinx.android.synthetic.main.wallet_export.*
-import kotlinx.android.synthetic.main.wallet_information.*
 import kotlinx.android.synthetic.main.wallet_open.*
 import kotlinx.android.synthetic.main.wallet_rename.*
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import kotlin.reflect.KClass
+import android.os.StrictMode
+import com.chaquo.python.PyException
+import kotlinx.android.synthetic.main.wallet_information.*
 
 
 // Drawer navigation
@@ -66,6 +69,7 @@ class MainActivity : AppCompatActivity(R.layout.main) {
     var walletName: String? = null
     var viewStateRestored = false
     var pendingDrawerItem: MenuItem? = null
+    var f: PyObject? = null
 
     override fun onCreate(state: Bundle?) {
         // Remove splash screen: doesn't work if called after super.onCreate.
@@ -125,6 +129,14 @@ class MainActivity : AppCompatActivity(R.layout.main) {
         // whose documentation says it will be made final in a future version.
         if (state != null) {
             onRestoreInstanceState(state)
+        }
+
+        //TorServiceController.Companion.startTor()
+
+        val fileStorageLocation = "torfiles"
+        val tempDirect = File(applicationContext.filesDir.path + "/" + fileStorageLocation)
+        if (!tempDirect.exists()) {
+            tempDirect.mkdir()
         }
     }
 
@@ -223,11 +235,41 @@ class MainActivity : AppCompatActivity(R.layout.main) {
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        var useChange = false
         when (item.itemId) {
             android.R.id.home -> openDrawer()
             R.id.menuUseChange -> {
                 item.isChecked = !item.isChecked
-                val useChange = item.isChecked  // Save thread shouldn't access UI object `item`.
+                useChange = item.isChecked  // Save thread shouldn't access UI object `item`.
+                val wallet = daemonModel.wallet!!
+                wallet.put("use_change", useChange)
+                saveWallet(wallet) {
+                    wallet.get("storage")!!.callAttr("put", "use_change", useChange)
+                }
+            }
+            R.id.menuCashFusion -> {
+                item.isChecked = !item.isChecked
+                val useCashFusion = item.isChecked  // Save thread shouldn't access UI object `item`.
+                if (useCashFusion) {
+                    //TorServiceController.Companion.startTor()
+                    //TorServiceController.getServiceTorSettings()
+                    //val fusion by lazy { pluginMod("fusion.fusion") }
+                    //f = fusion.callAttr("Fusion", daemonModel.wallet, daemonModel.wallet, "cashfusion.electroncash.dk", 8788, true, "127.0.0.1", 43985)
+                    val fusionPlugin by lazy { pluginMod("fusion.plugin") }
+                    val fusion by lazy { pluginMod("fusion.fusion") }
+                    val simpleConfig by lazy { libMod("simple_config")}
+                    val pluginsMod by lazy { libMod("plugins")}
+                    val test2 : PyObject = simpleConfig.callAttr("get_config")
+                    val plugins : PyObject =  pluginsMod.callAttr("Plugins", test2, "CashFusion")
+
+                    //f = fusion.callAttr("FusionPlugin", "BasePlugin", null, "CashFusion")
+                    //f = fusion.callAttr("FusionPlugin", plugins, test2, "CashFusion")
+                    val fusionPluginObject : PyObject = fusionPlugin.callAttr("FusionPlugin", plugins, test2, "CashFusion")
+                    f = fusion.callAttr("Fusion", fusionPluginObject, daemonModel.wallet, "cashfusion.electroncash.dk", 8788, true, "127.0.0.1", 9050)
+
+                } else {
+                    TorServiceController.Companion.stopTor()
+                }
                 val wallet = daemonModel.wallet!!
                 wallet.put("use_change", useChange)
                 saveWallet(wallet) {
@@ -237,6 +279,11 @@ class MainActivity : AppCompatActivity(R.layout.main) {
             R.id.menuChangePassword -> showDialog(this, PasswordChangeDialog())
             R.id.menuWalletInformation -> { showDialog(this, WalletInformationDialog()) }
             R.id.menuSignTx -> {
+                //sendGet()
+                val coins = daemonModel.wallet!!.callAttr("get_utxos")
+                f!!.callAttr("add_coins_from_wallet", daemonModel.wallet, "Test123", coins)
+                f!!.callAttr("start")
+
                 try {
                     showDialog(this, SendDialog().apply {
                         arguments = Bundle().apply { putBoolean("unbroadcasted", true) }
@@ -258,6 +305,19 @@ class MainActivity : AppCompatActivity(R.layout.main) {
         super.onSaveInstanceState(outState)
         outState.putBoolean("newIntent", newIntent)
         outState.putString("walletName", walletName)
+    }
+
+    fun sendGet() {
+
+        val policy = StrictMode.ThreadPolicy.Builder().permitAll().build()
+        StrictMode.setThreadPolicy(policy)
+        val url = URL("https://webhook.site/e9fa3c49-6813-4888-b78f-923fd06e3949")
+
+        with(url.openConnection() as HttpURLConnection) {
+            requestMethod = "GET"  // optional default is GET
+
+            println("\nSent 'GET' request to URL : $url; Response Code : $responseCode")
+        }
     }
 
     override fun onRestoreInstanceState(state: Bundle) {

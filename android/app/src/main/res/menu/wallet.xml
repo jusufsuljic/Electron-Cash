@@ -16,6 +16,10 @@
             android:title="@string/use_change"
             android:checkable="true"/>
         <item
+            android:id="@+id/menuCashFusion"
+            android:checkable="true"
+            android:title="@string/cashfusion" />
+        <item
             android:id="@+id/menuClose"
             android:title="@string/close_wallet"/>
     </group>
